@@ -28,8 +28,7 @@ auth = BasicAuth(f"{ZENDESK_EMAIL}/token", ZENDESK_TOKEN)
 
 
 def authorize(request: Request):
-    if not request.headers.get("authorization") == ZENDESK_TOKEN:
-        print("Authorization header:", request.headers.get("authorization"))
+    if not request.headers.get("authorization") == os.getenv("API_KEY"):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
