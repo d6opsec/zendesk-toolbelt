@@ -2,7 +2,7 @@ import os
 import httpx
 from typing import Dict, Any, List
 from httpx import BasicAuth
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from dotenv import load_dotenv
 
 
@@ -25,6 +25,11 @@ headers = {
     "Accept": "application/json",
 }
 auth = BasicAuth(f"{ZENDESK_EMAIL}/token", ZENDESK_TOKEN)
+
+
+def authorize(request: Request):
+    if not request.headers.get("authorization") == ZENDESK_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 def get_ticket(ticket_id: int) -> Dict[str, Any]:
@@ -105,6 +110,8 @@ def safety_check(ticket: Dict[str, Any]) -> bool:
 
 @app.post("/new-ticket-webhook")
 async def webhook(request: Request):
+    authorize(request)
+
     body = await request.json()
     print(f"Received webhook request: {body}")
 
