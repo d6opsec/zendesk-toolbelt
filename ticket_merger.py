@@ -108,8 +108,8 @@ def safety_check(ticket: Dict[str, Any]) -> bool:
     return ticket["via"]["source"]["from"]["address"] == TEST_EMAIL
 
 
-@app.post("/new-ticket-webhook")
-async def webhook(request: Request):
+@app.post("/merge-ticket-webhook")
+async def merge_ticket_webhook(request: Request):
     authorize(request)
 
     body = await request.json()
