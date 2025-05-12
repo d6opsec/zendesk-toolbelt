@@ -139,3 +139,8 @@ async def webhook(request: Request):
             print("No tickets to merge")
 
     return {"status": "bypass"}
+
+
+@app.get("/health-check")
+async def health_check():
+    return {"status": "ok"}
