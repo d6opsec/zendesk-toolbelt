@@ -1,7 +1,7 @@
 import os
-import requests
+import httpx
 from typing import Dict, Any, List
-from requests.auth import HTTPBasicAuth
+from httpx import BasicAuth
 from fastapi import FastAPI, Request
 from dotenv import load_dotenv
 
@@ -24,14 +24,15 @@ headers = {
     "Content-Type": "application/json",
     "Accept": "application/json",
 }
-auth = HTTPBasicAuth(f"{ZENDESK_EMAIL}/token", ZENDESK_TOKEN)
+auth = BasicAuth(f"{ZENDESK_EMAIL}/token", ZENDESK_TOKEN)
 
 
 def get_ticket(ticket_id: int) -> Dict[str, Any]:
     """Get ticket details from Zendesk API"""
-    response = requests.get(f"{ZENDESK_API_URL}/tickets/{ticket_id}", headers=headers, auth=auth)
-    response.raise_for_status()
-    return response.json()["ticket"]
+    with httpx.Client() as client:
+        response = client.get(f"{ZENDESK_API_URL}/tickets/{ticket_id}", headers=headers, auth=auth)
+        response.raise_for_status()
+        return response.json()["ticket"]
 
 
 def get_user_tickets(requester_id: int, sort_by: str = "created_at", sort_order: str = "asc") -> List[Dict[str, Any]]:
@@ -39,23 +40,24 @@ def get_user_tickets(requester_id: int, sort_by: str = "created_at", sort_order:
     tickets = []
 
     params = {"sort_by": sort_by, "sort_order": sort_order}
-    response = requests.get(
-        f"{ZENDESK_API_URL}/users/{requester_id}/tickets/requested",
-        headers=headers,
-        auth=auth,
-        params=params,
-    )
-    response.raise_for_status()
-
-    response_json = response.json()
-    tickets.extend(response_json["tickets"])
-
-    while response_json["next_page"]:
-        response = requests.get(response_json["next_page"], headers=headers, auth=auth)
+    with httpx.Client() as client:
+        response = client.get(
+            f"{ZENDESK_API_URL}/users/{requester_id}/tickets/requested",
+            headers=headers,
+            auth=auth,
+            params=params,
+        )
         response.raise_for_status()
 
         response_json = response.json()
         tickets.extend(response_json["tickets"])
+
+        while response_json["next_page"]:
+            response = client.get(response_json["next_page"], headers=headers, auth=auth)
+            response.raise_for_status()
+
+            response_json = response.json()
+            tickets.extend(response_json["tickets"])
 
     return tickets
 
@@ -76,22 +78,24 @@ def merge_tickets(
         "target_comment_is_public": target_comment_is_public,
         "source_comment_is_public": source_comment_is_public,
     }
-    response = requests.post(
-        f"{ZENDESK_API_URL}/tickets/{target_id}/merge",
-        headers=headers,
-        auth=auth,
-        json=data,
-    )
-    response.raise_for_status()
-    return response.json()
+    with httpx.Client() as client:
+        response = client.post(
+            f"{ZENDESK_API_URL}/tickets/{target_id}/merge",
+            headers=headers,
+            auth=auth,
+            json=data,
+        )
+        response.raise_for_status()
+        return response.json()
 
 
 def update_ticket_status(ticket_id: int, status: str) -> Dict[str, Any]:
     """Update ticket status"""
     data = {"ticket": {"status": status}}
-    response = requests.put(f"{ZENDESK_API_URL}/tickets/{ticket_id}", headers=headers, auth=auth, json=data)
-    response.raise_for_status()
-    return response.json()
+    with httpx.Client() as client:
+        response = client.put(f"{ZENDESK_API_URL}/tickets/{ticket_id}", headers=headers, auth=auth, json=data)
+        response.raise_for_status()
+        return response.json()
 
 
 def safety_check(ticket: Dict[str, Any]) -> bool:
