@@ -75,13 +75,21 @@ async def get_ticket(ticket_id: int) -> Dict[str, Any]:
 async def get_user_tickets(
     requester_id: int, sort_by: str = "created_at", sort_order: str = "asc"
 ) -> List[Dict[str, Any]]:
-    """Get all tickets for a specific user"""
+    """Get all tickets for a specific user using Zendesk Search API"""
 
     tickets = []
-    params = {"sort_by": sort_by, "sort_order": sort_order}
+    # Construct search query for tickets by requester
+    query = f"type:ticket requester_id:{requester_id}"
+    params: Dict[str, str | int] = {
+        "query": query,
+        "sort_by": sort_by,
+        "sort_order": sort_order,
+        "per_page": "100",  # Maximum allowed by Zendesk
+    }
+
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"{ZENDESK_API_URL}/users/{requester_id}/tickets/requested",
+            f"{ZENDESK_API_URL}/search.json",
             headers=headers,
             auth=auth,
             params=params,
@@ -89,14 +97,15 @@ async def get_user_tickets(
         response.raise_for_status()
 
         response_json = response.json()
-        tickets.extend(response_json["tickets"])
+        tickets.extend(response_json["results"])
 
-        while response_json["next_page"]:
+        # Handle pagination
+        while response_json.get("next_page"):
             response = await client.get(response_json["next_page"], headers=headers, auth=auth)
             response.raise_for_status()
 
             response_json = response.json()
-            tickets.extend(response_json["tickets"])
+            tickets.extend(response_json["results"])
 
     return tickets
 
