@@ -135,6 +135,7 @@ async def merge_tickets(
             auth=auth,
             json=data,
         )
+        print(response.text)
         response.raise_for_status()
         return response.json()
 
