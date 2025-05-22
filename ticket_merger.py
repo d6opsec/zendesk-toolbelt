@@ -135,7 +135,6 @@ async def merge_tickets(
             auth=auth,
             json=data,
         )
-        logger.info(f"Merge response: {response.text}")
         response.raise_for_status()
         return response.json()
 
@@ -172,17 +171,16 @@ async def merge_ticket_webhook(request: Request):
         all_tickets = await get_user_tickets(requester_id)
         all_tickets.append(new_ticket)
 
-        active_tickets = [ticket for ticket in all_tickets if ticket["status"] != "closed"]
-        logger.info(f"Active tickets: {active_tickets}")
+        active_tickets = {ticket["id"]: ticket for ticket in all_tickets if ticket["status"] != "closed"}
         logger.info(f"Found {len(active_tickets)}/{len(all_tickets)} active tickets for user {requester_id}")
 
         if len(active_tickets) > 1:
-            active_tickets.sort(key=lambda x: x["created_at"])
-            oldest_ticket = active_tickets[0]
+            sorted_tickets = sorted(active_tickets.values(), key=lambda x: x["created_at"])
+            oldest_ticket = sorted_tickets[0]
 
             target_status = "new" if oldest_ticket["status"] == "new" else "open"
 
-            for ticket in active_tickets[1:]:
+            for ticket in sorted_tickets[1:]:
                 logger.info(f"Merging ticket #{ticket['id']} into #{oldest_ticket['id']}")
                 job_status = await merge_tickets(
                     target_id=oldest_ticket["id"],
