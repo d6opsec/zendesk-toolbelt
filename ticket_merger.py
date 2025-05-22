@@ -17,6 +17,7 @@ load_dotenv()
 
 HEALTH_CHECK_URL = os.environ["HEALTH_CHECK_URL"]
 HEALTH_CHECK_INTERVAL = float(os.environ["HEALTH_CHECK_INTERVAL"])
+PRE_DELAY = float(os.environ["PRE_DELAY"])
 
 
 def keep_alive_worker():
@@ -163,7 +164,7 @@ async def merge_ticket_webhook(request: Request):
     requester_id = ticket_detail.get("requester_id")
 
     if requester_id:
-        await asyncio.sleep(120)
+        await asyncio.sleep(PRE_DELAY)
         new_ticket = await get_ticket(ticket_detail.get("id"))
         logger.info(f"New ticket #{new_ticket['id']}")
 
