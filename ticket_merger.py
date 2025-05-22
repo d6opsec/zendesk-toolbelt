@@ -75,10 +75,10 @@ async def get_ticket(ticket_id: int) -> Dict[str, Any]:
 
 async def get_user_tickets(
     requester_id: int, sort_by: str = "created_at", sort_order: str = "asc"
-) -> List[Dict[str, Any]]:
+) -> dict[int, Dict[str, Any]]:
     """Get all tickets for a specific user using Zendesk Search API"""
 
-    tickets = []
+    tickets: dict[int, Dict[str, Any]] = {}
     # Construct search query for tickets by requester
     query = f"type:ticket requester_id:{requester_id}"
     params: Dict[str, str | int] = {
@@ -98,7 +98,7 @@ async def get_user_tickets(
         response.raise_for_status()
 
         response_json = response.json()
-        tickets.extend(response_json["results"])
+        tickets.update({ticket["id"]: ticket for ticket in response_json["results"]})
 
         # Handle pagination
         while response_json.get("next_page"):
@@ -106,7 +106,7 @@ async def get_user_tickets(
             response.raise_for_status()
 
             response_json = response.json()
-            tickets.extend(response_json["results"])
+            tickets.update({ticket["id"]: ticket for ticket in response_json["results"]})
 
     return tickets
 
@@ -169,9 +169,9 @@ async def merge_ticket_webhook(request: Request):
         logger.info(f"New ticket #{new_ticket['id']}")
 
         all_tickets = await get_user_tickets(requester_id)
-        all_tickets.append(new_ticket)
+        all_tickets[new_ticket["id"]] = new_ticket
 
-        active_tickets = {ticket["id"]: ticket for ticket in all_tickets if ticket["status"] != "closed"}
+        active_tickets = {key: ticket for key, ticket in all_tickets.items() if ticket["status"] != "closed"}
         logger.info(f"Found {len(active_tickets)}/{len(all_tickets)} active tickets for user {requester_id}")
 
         if len(active_tickets) > 1:
