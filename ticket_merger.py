@@ -135,7 +135,7 @@ async def merge_tickets(
             auth=auth,
             json=data,
         )
-        print(response.text)
+        logger.info(f"Merge response: {response.text}")
         response.raise_for_status()
         return response.json()
 
