@@ -173,6 +173,7 @@ async def merge_ticket_webhook(request: Request):
         all_tickets.append(new_ticket)
 
         active_tickets = [ticket for ticket in all_tickets if ticket["status"] != "closed"]
+        logger.info(f"Active tickets: {active_tickets}")
         logger.info(f"Found {len(active_tickets)}/{len(all_tickets)} active tickets for user {requester_id}")
 
         if len(active_tickets) > 1:
