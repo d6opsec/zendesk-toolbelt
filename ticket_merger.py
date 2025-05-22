@@ -163,6 +163,7 @@ async def merge_ticket_webhook(request: Request):
     requester_id = ticket_detail.get("requester_id")
 
     if requester_id:
+        await asyncio.sleep(120)
         new_ticket = await get_ticket(ticket_detail.get("id"))
         logger.info(f"New ticket #{new_ticket['id']}")
 
