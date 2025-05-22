@@ -4,7 +4,7 @@ import threading
 import httpx
 import time
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, TypedDict
 from httpx import BasicAuth
 from fastapi import FastAPI, Request, HTTPException
 from dotenv import load_dotenv
@@ -18,6 +18,9 @@ load_dotenv()
 HEALTH_CHECK_URL = os.environ["HEALTH_CHECK_URL"]
 HEALTH_CHECK_INTERVAL = float(os.environ["HEALTH_CHECK_INTERVAL"])
 PRE_DELAY = float(os.environ["PRE_DELAY"])
+
+
+running_tasks: dict[str, asyncio.Task] = {}
 
 
 def keep_alive_worker():
@@ -65,7 +68,7 @@ def authorize(request: Request):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-async def get_ticket(ticket_id: int) -> Dict[str, Any]:
+async def get_ticket(ticket_id: str) -> Dict[str, Any]:
     """Get ticket details from Zendesk API"""
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{ZENDESK_API_URL}/tickets/{ticket_id}", headers=headers, auth=auth)
@@ -74,7 +77,7 @@ async def get_ticket(ticket_id: int) -> Dict[str, Any]:
 
 
 async def get_user_tickets(
-    requester_id: int, sort_by: str = "created_at", sort_order: str = "asc"
+    requester_id: str, sort_by: str = "created_at", sort_order: str = "asc"
 ) -> dict[int, Dict[str, Any]]:
     """Get all tickets for a specific user using Zendesk Search API"""
 
@@ -112,8 +115,8 @@ async def get_user_tickets(
 
 
 async def merge_tickets(
-    target_id: int,
-    ids: list[int],
+    target_id: str,
+    ids: list[str],
     target_comment: str = "",
     source_comment: str = "",
     target_comment_is_public: bool = False,
@@ -139,7 +142,7 @@ async def merge_tickets(
         return response.json()
 
 
-async def update_ticket_status(ticket_id: int, status: str) -> Dict[str, Any]:
+async def update_ticket_status(ticket_id: str, status: str) -> Dict[str, Any]:
     """Update ticket status"""
     data = {"ticket": {"status": status}}
     async with httpx.AsyncClient() as client:
@@ -153,19 +156,11 @@ def safety_check(ticket: Dict[str, Any]) -> bool:
     return ticket["via"]["source"]["from"]["address"] == TEST_EMAIL
 
 
-@app.post("/merge-ticket-webhook")
-async def merge_ticket_webhook(request: Request):
-    authorize(request)
-
-    body = await request.json()
-    logger.info(f"Received webhook request: {body}")
-
-    ticket_detail = body.get("detail", {})
-    requester_id = ticket_detail.get("requester_id")
-
-    if requester_id:
+async def merge_task(ticket_id: str, requester_id: str):
+    try:
         await asyncio.sleep(PRE_DELAY)
-        new_ticket = await get_ticket(ticket_detail.get("id"))
+
+        new_ticket = await get_ticket(ticket_id)
         logger.info(f"New ticket #{new_ticket['id']}")
 
         all_tickets = await get_user_tickets(requester_id)
@@ -191,9 +186,28 @@ async def merge_ticket_webhook(request: Request):
 
                 updated_ticket = await update_ticket_status(oldest_ticket["id"], target_status)
                 logger.info(f"Updated ticket #{oldest_ticket['id']} to '{target_status}'")
-            return {"status": "success"}
         else:
             logger.info("No tickets to merge")
+    finally:
+        running_tasks.pop(ticket_id)
+
+
+@app.post("/merge-ticket-webhook")
+async def merge_ticket_webhook(request: Request):
+    authorize(request)
+
+    body = await request.json()
+    logger.info(f"Received webhook request: {body}")
+
+    ticket_detail = body.get("detail", {})
+    ticket_id = ticket_detail.get("id")
+    requester_id = ticket_detail.get("requester_id")
+
+    if requester_id:
+        if ticket_id in running_tasks:
+            logger.info(f"Ticket #{ticket_id} is already being processed")
+            return {"status": "bypass"}
+        running_tasks[ticket_id] = asyncio.create_task(merge_task(ticket_id, requester_id))
 
     return {"status": "bypass"}
 
