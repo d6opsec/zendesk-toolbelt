@@ -158,6 +158,7 @@ def safety_check(ticket: Dict[str, Any]) -> bool:
 
 async def merge_task(ticket_id: str, requester_id: str):
     try:
+        logger.info(f"Starting merge task for ticket #{ticket_id}")
         await asyncio.sleep(PRE_DELAY)
 
         new_ticket = await get_ticket(ticket_id)
