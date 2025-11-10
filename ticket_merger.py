@@ -4,7 +4,7 @@ import threading
 import httpx
 import time
 import logging
-from typing import Dict, Any, List, TypedDict
+from typing import Dict, Any
 from httpx import BasicAuth
 from fastapi import FastAPI, Request, HTTPException
 from dotenv import load_dotenv
@@ -19,6 +19,11 @@ HEALTH_CHECK_URL = os.environ["HEALTH_CHECK_URL"]
 HEALTH_CHECK_INTERVAL = float(os.environ["HEALTH_CHECK_INTERVAL"])
 PRE_DELAY = float(os.environ["PRE_DELAY"])
 
+# Email blacklist - tickets from these emails will not be merged
+EMAIL_BLACKLIST: set[str] = {
+    "crossborder@kca.go.kr",
+    "cukbusan@cuk.or.kr",
+}
 
 running_tasks: dict[str, asyncio.Task] = {}
 
@@ -82,7 +87,7 @@ async def get_user_tickets(
     """Get all tickets for a specific user using Zendesk Search API"""
 
     tickets: dict[int, Dict[str, Any]] = {}
-    # Construct search query for tickets by requester
+
     query = f"type:ticket requester_id:{requester_id}"
     params: Dict[str, str | int] = {
         "query": query,
@@ -163,6 +168,12 @@ async def merge_task(ticket_id: str, requester_id: str):
 
         new_ticket = await get_ticket(ticket_id)
         logger.info(f"New ticket #{new_ticket['id']}")
+
+        # Check if ticket is from a blacklisted email
+        requester_email = new_ticket.get("via", {}).get("source", {}).get("from", {}).get("address", "")
+        if requester_email in EMAIL_BLACKLIST:
+            logger.info(f"Skipping merge for ticket #{ticket_id} from blacklisted email: {requester_email}")
+            return
 
         all_tickets = await get_user_tickets(requester_id)
         all_tickets[new_ticket["id"]] = new_ticket
