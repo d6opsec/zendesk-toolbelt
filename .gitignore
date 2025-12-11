@@ -1,3 +1,7 @@
+.DS_Store
+*.ipynb
+*.zip
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
