@@ -210,11 +210,11 @@ async def merge_ticket_webhook(request: Request):
     body = await request.json()
     logger.info(f"Received webhook request: {body}")
 
-    request_id = body.get("id", "none")
-    channel = body.get("detail", {}).get("via", {}).get("channel", "")
-    if channel != "mail":
-        logger.info(f"Skipping merge for request `#{request_id}` from non-mail channel: {channel}")
-        return {"status": "bypass"}
+    # request_id = body.get("id", "none")
+    # channel = body.get("detail", {}).get("via", {}).get("channel", "")
+    # if channel != "mail":
+    #     logger.info(f"Skipping merge for request `#{request_id}` from non-mail channel: {channel}")
+    #     return {"status": "bypass"}
 
     ticket_detail = body.get("detail", {})
     ticket_id = ticket_detail.get("id")
