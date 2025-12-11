@@ -195,7 +195,6 @@ async def merge_task(ticket_id: str, requester_id: str):
                     target_comment=f"Ticket #{ticket['id']} ({ticket['subject']}: {ticket['description']}) merged into this ticket",
                     source_comment=f"Merged into ticket #{oldest_ticket['id']}",
                 )
-
                 updated_ticket = await update_ticket_status(oldest_ticket["id"], target_status)
                 logger.info(f"Updated ticket #{oldest_ticket['id']} to '{target_status}'")
         else:
@@ -210,6 +209,12 @@ async def merge_ticket_webhook(request: Request):
 
     body = await request.json()
     logger.info(f"Received webhook request: {body}")
+
+    request_id = body.get("id", "none")
+    channel = body.get("detail", {}).get("via", {}).get("channel", "")
+    if channel != "mail":
+        logger.info(f"Skipping merge for request `#{request_id}` from non-mail channel: {channel}")
+        return {"status": "bypass"}
 
     ticket_detail = body.get("detail", {})
     ticket_id = ticket_detail.get("id")
